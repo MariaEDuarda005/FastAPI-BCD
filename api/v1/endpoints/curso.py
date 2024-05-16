@@ -22,8 +22,48 @@ async def post_curso(curso: CursoSchema, db: AsyncSession = Depends(get_session)
                             aulas = curso.aulas,
                             horas = curso.horas,
                             instrutor = curso.instrutor)
+    # não é preciso colocar o id por que ele já é gerado pelo banco 
    
-    db.add(novo_curso)
+    db.add(novo_curso) # adiciona no banco de dados 
     await db.commit()
     return novo_curso
- 
+
+#GET CURSOS
+# response_model compara com o cursoShema, faz a documentação e valida os dados 
+@router.get('/', response_model=List[CursoSchema])
+async def get_cursos(db: AsyncSession = Depends(get_session)): # conexão assincrona para trazer com o banco
+    async with db as session:
+        query = select(CursoModel)
+        result = await session.execute(query)
+        cursos: List[CursoModel] = result.scalars().all()
+        return cursos
+
+# GET CURSOS INDIVIDUAIS
+@router.get('/{curso_id}', response_model=CursoSchema, status_code=status.HTTP_200_OK)
+async def get_curso(curso_id: int, db: AsyncSession = Depends(get_session)):
+    async with db as session:
+        query = select(CursoModel).filter(CursoModel.id == curso_id)
+        result = await session.execute(query)
+        curso = result.scalar_one_or_none()
+        if curso:
+            return curso
+        else:
+            raise(HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Curso não encontrado"))
+        
+# PUT CURSOS para atualizar        
+@router.put('/{curso_id}', response_model=CursoSchema, status_code=status.HTTP_202_ACCEPTED)
+async def put_curso(curso_id: int, curso: CursoSchema, db: AsyncSession = Depends(get_session)):
+    async with db as session:
+        query = select(CursoModel).filter(CursoModel.id == curso_id)
+        result = await session.execute(query)
+        curso_up = result.scalar_one_or_none()
+        if curso_up:
+            # atualizr pelo o que enviou no json 
+            curso_up.titulo = curso.titulo
+            curso_up.aulas = curso.aulas
+            curso_up.horas = curso.horas
+            curso_up.instrutor = curso.instrutor
+            await session.commit()
+            return curso_up
+        else:
+            raise(HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Curso não encontrado"))
